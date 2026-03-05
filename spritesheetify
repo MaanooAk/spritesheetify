@@ -4,7 +4,6 @@
 # repo: https://github.com/MaanooAk/spritesheetify
 
 # TODO implement trimming with the image box
-# TODO implement image layer composition
 
 
 from sys import exit, stderr
@@ -98,10 +97,20 @@ class Sheet:
 
 def load_sprites_directoty(filename):
     path = Path(filename)
+
     for i in path.rglob("*.png"):
         load_sprite_file(i)
+
+    pending = []
     for i in path.rglob("*.png.txt"):
-        load_sprite_meta(i)
+        if load_sprite_meta(i) is False:
+            pending.append(i)
+
+    while len(pending) > 0:
+        left = len(pending)
+        pending = [i for i in pending if load_sprite_meta(i) is False]
+        if left == len(pending):
+            load_sprite_meta(i, True)
 
 
 def load_sprite_file(path):
@@ -110,22 +119,38 @@ def load_sprite_file(path):
     return load_sprite(path, name, image)
 
 
-def load_sprite_meta(path):
+def load_sprite_meta(path, last=False):
     name = path.name.removesuffix(".png.txt")
     image = None
 
     content = path.read_text()
     lines = content.split("\n")
     for line in lines:
+        if len(line) == 0 or line[0] == "#":
+            continue
         command, *params = line.split(" ")
-        if command == "source":
+        if command in ["source", "layer", "above", "top", "below", "bottom"]:
             reference_name = params[0]
             source_sprite = sprites.get(reference_name)
             if source_sprite is None:
-                return exit_code(f"Error: Sprite reference not found: {reference_name}")
-            image = source_sprite.image.rotate(0)
+                if last:
+                    return exit_code(1, f"Error: Sprite reference '{reference_name}' not found: {path}")
+                return False
+            if image is None:
+                image = source_sprite.image.copy()
+            else:
+                if command in ["below", "bottom"]:
+                    current = image
+                    image = source_sprite.image.copy()
+                    image.paste(current, (0, 0), current)
+                else:
+                    image.paste(source_sprite.image, (0, 0), source_sprite.image)
         elif command == "rotate":
             image = image.rotate(int(params[0]))
+        elif command == "rotate+":
+            image = image.rotate(int(params[0]), expand=1)
+        else:
+            return exit_code(1, f"Error: Unknown command '{command}': {path}")
 
     return load_sprite(path, name, image)
 
@@ -138,7 +163,8 @@ def load_sprite(path, name, image):
     sprite.size = image.size
 
     if "A" in image.getbands():
-        (left, upper, right, lower) = image.split()[-1].getbbox()
+        alpha_box = image.split()[-1].getbbox()
+        (left, upper, right, lower) = alpha_box or (0, 0, image.size[0], image.size[1])
         sprite.box_offset = (left, upper)
         sprite.box_size = (right-left, lower-upper)
     else:
