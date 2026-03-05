@@ -1,0 +1,258 @@
+#!/bin/env python3
+# spritesheetify
+# author: Akritas Akritidis
+# repo: https://github.com/MaanooAk/spritesheetify
+
+# TODO implement trimming with the image box
+# TODO implement image layer composition
+
+
+from sys import exit, stderr
+from argparse import ArgumentParser
+from pathlib import Path
+
+
+def exit_code(code, message):
+    print(message, file=stderr)
+    exit(code)
+
+
+def collect_paths(filenames):
+    for filename in filenames:
+        path = Path(filename)
+        for i in path.rglob("*.png"):
+            yield i
+        for i in path.rglob("*.png.txt"):
+            yield i
+
+
+parser = ArgumentParser(
+    description="Generate spritesheet"
+)
+parser.add_argument(
+    "output",
+    help="output spritesheet file prefix"
+)
+parser.add_argument(
+    "inputs", nargs="+",
+    help="sprite directories"
+)
+parser.add_argument(
+    "-e", "--extrude", type=int, default=3,
+    help="extrude size (default: 3)"
+)
+parser.add_argument(
+    "-m", "--max", type=int, default=4096,
+    help="maximum size (default: 4096)"
+)
+parser.add_argument(
+    "-f", "--force", "-B", action="store_true",
+    help="force spritesheet generation"
+)
+
+args = parser.parse_args()
+output_info_path = Path(args.output + ".json")
+
+
+def path_mod_time(path):
+    stat = path.stat()
+    return max(stat.st_mtime, stat.st_ctime)
+
+
+if not args.force and output_info_path.exists():
+    output_modified = output_info_path.stat().st_mtime
+    sprites_modified = max(map(path_mod_time, collect_paths(args.inputs)))
+
+    if sprites_modified < output_modified:
+        exit(0)
+
+
+# fmt: off
+from collections import OrderedDict
+from dataclasses import dataclass, asdict
+from PIL import Image
+from json import dumps
+# fmt: on
+
+
+@dataclass
+class Sprite:
+    path: Path = None
+    name: str = None
+    image: ImageFile = None
+    size: (int, int) = None
+    box_offset: (int, int) = None
+    box_size: (int, int) = None
+    sheet_id: int = None
+    sheet_pos: (int, int) = None
+
+
+@dataclass
+class Sheet:
+    id: int
+    size: (int, int) = (0, 0)
+    line_offset: (int, int) = (0, 0)
+    line_size: (int, int) = (0, 0)
+    image: Image = None
+
+
+def load_sprites_directoty(filename):
+    path = Path(filename)
+    for i in path.rglob("*.png"):
+        load_sprite_file(i)
+    for i in path.rglob("*.png.txt"):
+        load_sprite_meta(i)
+
+
+def load_sprite_file(path):
+    name = path.name.removesuffix(".png")
+    image = Image.open(path)
+    return load_sprite(path, name, image)
+
+
+def load_sprite_meta(path):
+    name = path.name.removesuffix(".png.txt")
+    image = None
+
+    content = path.read_text()
+    lines = content.split("\n")
+    for line in lines:
+        command, *params = line.split(" ")
+        if command == "source":
+            reference_name = params[0]
+            source_sprite = sprites.get(reference_name)
+            if source_sprite is None:
+                return exit_code(f"Error: Sprite reference not found: {reference_name}")
+            image = source_sprite.image.rotate(0)
+        elif command == "rotate":
+            image = image.rotate(int(params[0]))
+
+    return load_sprite(path, name, image)
+
+
+def load_sprite(path, name, image):
+    sprite = Sprite()
+    sprite.path = path
+    sprite.name = name
+    sprite.image = image
+    sprite.size = image.size
+
+    if "A" in image.getbands():
+        (left, upper, right, lower) = image.split()[-1].getbbox()
+        sprite.box_offset = (left, upper)
+        sprite.box_size = (right-left, lower-upper)
+    else:
+        sprite.box_offset = (0, 0)
+        sprite.box_size = image.size
+
+    if name in sprites:
+        return exit_code(1, f"Error: Duplicate name: {name}")
+
+    sprites[name] = sprite
+
+
+def pack(sprites, sheets):
+
+    for sprite in sprites:
+        for sheet in sheets:
+            if pack_sprite(sprite, sheet):
+                break
+        if sprite.sheet_id is None:
+            sheet = Sheet(len(sheets))
+            sheets.append(sheet)
+            pack_sprite(sprite, sheet)
+
+
+def pack_sprite(sprite, sheet):
+    e = args.extrude
+    size = (sprite.size[0] + e*2, sprite.size[1] + e*2)
+
+    if size[0] > args.max or size[1] > args.max:
+        return exit_code(1, f"Sprite bigger than max size: {sprite.name}")
+
+    h_space = args.max - sheet.line_offset[1]
+    if h_space < size[1]:
+        return False
+
+    w_space = args.max - sheet.line_size[0]
+    if w_space < size[0]:
+        sheet.line_offset = (0, sheet.line_offset[1] + sheet.line_size[1])
+        sheet.line_size = (0, 0)
+
+    h_space = args.max - sheet.line_offset[1]
+    if h_space < size[1]:
+        return False
+
+    sprite.sheet_id = sheet.id
+    sprite.sheet_pos = (
+        sheet.line_offset[0] + sheet.line_size[0] + e,
+        sheet.line_offset[1] + e)
+    sheet.line_size = (
+        sheet.line_size[0] + size[0],
+        max(sheet.line_size[1], size[1]))
+    sheet.size = (max(sheet.size[0], sheet.line_size[0]),
+                  sheet.line_offset[1] + sheet.line_size[1])
+
+    return True
+
+
+def generate(sprites, sheets):
+
+    for sheet in sheets:
+        image = Image.new("RGBA", sheet.size, (0, 0, 0, 0))
+
+        for sprite in sprites:
+            if sprite.sheet_id != sheet.id:
+                continue
+            x, y = sprite.sheet_pos
+            w, h = sprite.size
+            image.paste(sprite.image, (x, y))
+            for e in range(args.extrude):
+                image.paste(sprite.image.crop((0, 0, w, 1)), (x, y - e))
+                image.paste(sprite.image.crop(
+                    (0, h-1, w, h)), (x, y + h + e - 1))
+                image.paste(sprite.image.crop((0, 0, 1, h)), (x-e, y))
+                image.paste(sprite.image.crop(
+                    (w-1, 0, w, h)), (x + w + e - 1, y))
+
+        sheet.image = image
+        sheet.image.save(f"{args.output}.{sheet.id}.png")
+
+
+sprites = OrderedDict()
+
+for input in args.inputs:
+    load_sprites_directoty(input)
+
+sorted_sprites = sorted(sprites.values(), key=lambda sprite: (
+    -sprite.size[1], -sprite.size[0], sprite.name
+))
+
+sheets = []
+pack(sorted_sprites, sheets)
+generate(sorted_sprites, sheets)
+
+output_info_path.write_text(dumps(
+    {
+        "sheets": len(sheets),
+        "sprites": [{
+            "name": i.name,
+            "sheet": i.sheet_id,
+            "w": i.size[0],
+            "h": i.size[1],
+            "area": {
+                "x": 0,
+                "y": 0,
+                "w": i.size[0],
+                "h": i.size[1],
+            },
+            "mapped": {
+                "x": i.sheet_pos[0],
+                "y": i.sheet_pos[1],
+                "w": i.size[0],
+                "h": i.size[1],
+            },
+        } for i in sorted_sprites]
+    },
+    indent=2
+))
