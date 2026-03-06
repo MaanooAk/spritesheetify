@@ -21,6 +21,8 @@ def collect_paths(filenames):
         path = Path(filename)
         for i in path.rglob("*.png"):
             yield i
+        for i in path.rglob("*.ora"):
+            yield i
         for i in path.rglob("*.png.txt"):
             yield i
 
@@ -70,6 +72,9 @@ if not args.force and output_info_path.exists():
 from collections import OrderedDict
 from dataclasses import dataclass, asdict
 from PIL import Image
+from zipfile import ZipFile
+from io import BytesIO
+from xml.etree import ElementTree
 from json import dumps
 # fmt: on
 
@@ -102,6 +107,9 @@ def load_sprites_directory(filename):
     for i in path.rglob("*.png"):
         load_sprite_file(i)
 
+    for i in path.rglob("*.ora"):
+        load_sprite_ora(i)
+
     pending = []
     for i in path.rglob("*.png.txt"):
         if load_sprite_meta(i) is False:
@@ -118,6 +126,56 @@ def load_sprite_file(path):
     name = path.name.removesuffix(".png")
     image = Image.open(path)
     return load_sprite(path, name, image)
+
+
+def load_sprite_ora(path):
+    path_name = path.name.removesuffix(".ora")
+
+    with ZipFile(path) as z:
+        names = z.namelist()
+
+        merged = Image.open(BytesIO(z.read("mergedimage.png")))
+        load_sprite(path, path_name, merged)
+
+        stack_data = z.read("stack.xml")
+        root = ElementTree.fromstring(stack_data)
+        size = (int(root.attrib.get("w")), int(root.attrib.get("h")))
+
+        root_stack = root[0]
+        layers = dict()
+
+        for root_layer in reversed(root_stack):
+            visible = root_layer.attrib.get("visibility") != "hidden"
+            if not visible:
+                continue
+
+            name = root_layer.attrib.get("name")
+            if name not in layers:
+                layers[name] = Image.new("RGBA", size, (0, 0, 0, 0))
+
+            load_sprite_ora_layers(z, layers[name], root_layer)
+
+        for name, image in layers.items():
+            load_sprite(path, path_name + "." + name, image)
+
+
+def load_sprite_ora_layers(z, layer_image, element):
+    visible = element.attrib.get("visibility") != "hidden"
+    if not visible:
+        return
+
+    if element.tag == "stack":
+        for i in reversed(element):
+            load_sprite_ora_layers(z, layer_image, i)
+
+    elif element.tag == "layer":
+        src = element.attrib.get("src")
+        image = Image.open(BytesIO(z.read(src)))
+        offset = (
+            int(element.attrib.get("x", "0")),
+            int(element.attrib.get("y", "0")))
+
+        layer_image.paste(image, offset, image)
 
 
 def load_sprite_meta(path, last=False):
@@ -145,7 +203,8 @@ def load_sprite_meta(path, last=False):
                     image = source_sprite.image.copy()
                     image.paste(current, (0, 0), current)
                 else:
-                    image.paste(source_sprite.image, (0, 0), source_sprite.image)
+                    image.paste(source_sprite.image,
+                                (0, 0), source_sprite.image)
         elif command == "rotate":
             image = image.rotate(int(params[0]))
         elif command == "rotate+":
@@ -177,7 +236,8 @@ def load_sprite(path, name, image):
 
     if "A" in image.getbands():
         alpha_box = image.split()[-1].getbbox()
-        (left, upper, right, lower) = alpha_box or (0, 0, image.size[0], image.size[1])
+        (left, upper, right, lower) = alpha_box or (
+            0, 0, image.size[0], image.size[1])
         sprite.box_offset = (left, upper)
         sprite.box_size = (right-left, lower-upper)
     else:
@@ -185,7 +245,7 @@ def load_sprite(path, name, image):
         sprite.box_size = image.size
 
     if name in sprites:
-        return exit_code(1, f"Error: Duplicate name: {name}")
+        return exit_code(1, f"Error: Duplicate name '{name}': {path}, {sprites[name].path}")
 
     sprites[name] = sprite
 

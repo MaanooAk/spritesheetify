@@ -4,8 +4,9 @@
 Generate packed spritesheets from directories of sprites
 
 - supports extrude
+- extract layers from OpenRaster files
 - interprets text files to generate sprites on the fly
-  - operations: source, rotate, bellow, above
+  - operations: source, rotate, below, above
 - check if file has been modified since last generation
 
 ### Usage
@@ -23,7 +24,13 @@ Every file with the extension `.png.txt` will be interpreted.
 Each line contains a single command:
 
 - `source name`: layer referenced image (alias: `layer`, `above`, `top`)
-- `below name`: layer referenced image bellow (alias: `bottom`)
+- `below name`: layer referenced image below (alias: `bottom`)
 - `resize w h`: resize current image, aspect ratio if dimension is 0
 - `rotate angle`: rotate current image
 - `rotate+ angle`: rotate current image and expand to fit
+
+### OpenRaster
+
+For each top layer/group of the OpenRaster file generate a sprite with the name `(file name).(layer name)`.
+
+The sprite will be the merge of all sub-layers or layers with the same name. Invisible layers will be ignored.
