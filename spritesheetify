@@ -84,6 +84,7 @@ class Sprite:
     box_size: (int, int) = None
     sheet_id: int = None
     sheet_pos: (int, int) = None
+    skip: bool = False
 
 
 @dataclass
@@ -95,7 +96,7 @@ class Sheet:
     image: Image = None
 
 
-def load_sprites_directoty(filename):
+def load_sprites_directory(filename):
     path = Path(filename)
 
     for i in path.rglob("*.png"):
@@ -149,6 +150,17 @@ def load_sprite_meta(path, last=False):
             image = image.rotate(int(params[0]))
         elif command == "rotate+":
             image = image.rotate(int(params[0]), expand=1)
+        elif command == "resize":
+            if len(params) == 1:
+                image = image.resize((int(params[0]), int(params[0])))
+            else:
+                w, h = int(params[0]), int(params[1])
+                if h <= 0:
+                    image = image.resize((w, image.h * w / image.w))
+                elif w <= 0:
+                    image = image.resize((image.w * h / image.h, h))
+                else:
+                    image = image.resize((w, h))
         else:
             return exit_code(1, f"Error: Unknown command '{command}': {path}")
 
@@ -159,6 +171,7 @@ def load_sprite(path, name, image):
     sprite = Sprite()
     sprite.path = path
     sprite.name = name
+    sprite.skip = name.startswith(".")
     sprite.image = image
     sprite.size = image.size
 
@@ -180,6 +193,8 @@ def load_sprite(path, name, image):
 def pack(sprites, sheets):
 
     for sprite in sprites:
+        if sprite.skip:
+            continue
         for sheet in sheets:
             if pack_sprite(sprite, sheet):
                 break
@@ -248,7 +263,7 @@ def generate(sprites, sheets):
 sprites = OrderedDict()
 
 for input in args.inputs:
-    load_sprites_directoty(input)
+    load_sprites_directory(input)
 
 sorted_sprites = sorted(sprites.values(), key=lambda sprite: (
     -sprite.size[1], -sprite.size[0], sprite.name
@@ -278,7 +293,7 @@ output_info_path.write_text(dumps(
                 "w": i.size[0],
                 "h": i.size[1],
             },
-        } for i in sorted_sprites]
+        } for i in sorted_sprites if not i.skip]
     },
     indent=2
 ))
