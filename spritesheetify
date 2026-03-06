@@ -11,22 +11,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 
-def exit_code(code, message):
-    print(message, file=stderr)
-    exit(code)
-
-
-def collect_paths(filenames):
-    for filename in filenames:
-        path = Path(filename)
-        for i in path.rglob("*.png"):
-            yield i
-        for i in path.rglob("*.ora"):
-            yield i
-        for i in path.rglob("*.png.txt"):
-            yield i
-
-
 parser = ArgumentParser(
     description="Generate spritesheet"
 )
@@ -50,15 +34,31 @@ parser.add_argument(
     "-f", "--force", "-B", action="store_true",
     help="force spritesheet generation"
 )
+parser.add_argument(
+    "-t", "--text", type=str, default=".png.txt",
+    help="extension for the script text files"
+)
 
 args = parser.parse_args()
-output_info_path = Path(args.output + ".json")
+
+
+def collect_paths(filenames):
+    for filename in filenames:
+        path = Path(filename)
+        for i in path.rglob("*.png"):
+            yield i
+        for i in path.rglob("*.ora"):
+            yield i
+        for i in path.rglob("*" + args.text):
+            yield i
 
 
 def path_mod_time(path):
     stat = path.stat()
     return max(stat.st_mtime, stat.st_ctime)
 
+
+output_info_path = Path(args.output + ".json")
 
 if not args.force and output_info_path.exists():
     output_modified = output_info_path.stat().st_mtime
@@ -77,6 +77,11 @@ from io import BytesIO
 from xml.etree import ElementTree
 from json import dumps
 # fmt: on
+
+
+def exit_code(code, message):
+    print(message, file=stderr)
+    exit(code)
 
 
 @dataclass
@@ -111,7 +116,7 @@ def load_sprites_directory(filename):
         load_sprite_ora(i)
 
     pending = []
-    for i in path.rglob("*.png.txt"):
+    for i in path.rglob("*" + args.text):
         if load_sprite_meta(i) is False:
             pending.append(i)
 
@@ -119,7 +124,7 @@ def load_sprites_directory(filename):
         left = len(pending)
         pending = [i for i in pending if load_sprite_meta(i) is False]
         if left == len(pending):
-            load_sprite_meta(i, True)
+            load_sprite_meta(pending[0], True)
 
 
 def load_sprite_file(path):
@@ -179,7 +184,7 @@ def load_sprite_ora_layers(z, layer_image, element):
 
 
 def load_sprite_meta(path, last=False):
-    name = path.name.removesuffix(".png.txt")
+    name = path.name.removesuffix(args.text)
     image = None
 
     content = path.read_text()
@@ -215,9 +220,9 @@ def load_sprite_meta(path, last=False):
             else:
                 w, h = int(params[0]), int(params[1])
                 if h <= 0:
-                    image = image.resize((w, image.h * w / image.w))
+                    image = image.resize((w, int(image.size[1] * w / image.size[0])))
                 elif w <= 0:
-                    image = image.resize((image.w * h / image.h, h))
+                    image = image.resize((int(image.size[0] * h / image.size[1]), h))
                 else:
                     image = image.resize((w, h))
         else:
