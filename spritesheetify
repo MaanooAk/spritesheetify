@@ -366,25 +366,24 @@ sheets = []
 pack(sorted_sprites, sheets)
 generate(sorted_sprites, sheets)
 
-output_info_path.write_text(dumps(
-    {
-        "sheets": len(sheets),
-        "sprites": [{
-            "name": i.name,
-            "sheet": i.sheet_id,
-            "frame": {
-                "x": i.sheet_pos[0],
-                "y": i.sheet_pos[1],
-                "w": i.size[0],
-                "h": i.size[1],
-            },
-            "box": {
-                "x": i.sheet_pos[0] + i.box_offset[0],
-                "y": i.sheet_pos[1] + i.box_offset[1],
-                "w": i.box_size[0],
-                "h": i.box_size[1],
-            },
-        } for i in sorted_sprites if not i.skip]
-    },
-    indent=2
-))
+sprites_list = ",\n".join([
+    dumps({
+        "name": i.name,
+        "sheet": i.sheet_id,
+        "frame": {
+            "x": i.sheet_pos[0],
+            "y": i.sheet_pos[1],
+            "w": i.size[0],
+            "h": i.size[1],
+        },
+        "box": {
+            "x": i.sheet_pos[0] + i.box_offset[0],
+            "y": i.sheet_pos[1] + i.box_offset[1],
+            "w": i.box_size[0],
+            "h": i.box_size[1],
+        },
+    }, separators=(',', ':')) for i in sorted_sprites if not i.skip
+])
+document = f"""{{"sheets":{len(sheets)},"sprites":[\n{sprites_list}\n]}}"""
+
+output_info_path.write_text(document)
