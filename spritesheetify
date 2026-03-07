@@ -187,16 +187,24 @@ def load_sprite_ora_layers(z, layer_image, element):
         layer_image.paste(image, offset, image)
 
 
-def load_sprite_meta(path, last=False):
+def load_sprite_meta(path, last=False, id=None):
     name = path.name.removesuffix(args.script)
     image = None
 
     content = path.read_text()
     lines = content.split("\n")
+    flags = None
     for line in lines:
         if len(line) == 0 or line[0] == "#":
             continue
-        command, *params = line.split(" ")
+        parts = line.split(" ")
+        if parts[0] == "mask":
+            mask = int(parts[1])
+            if id & mask == 0:
+                continue
+            parts = parts[2:]
+
+        command, *params = parts
         if command in ["source", "layer", "above", "top", "below", "bottom"]:
             reference_name = params[0]
             source_sprite = sprites.get(reference_name)
@@ -224,16 +232,30 @@ def load_sprite_meta(path, last=False):
             else:
                 w, h = int(params[0]), int(params[1])
                 if h <= 0:
-                    image = image.resize((w, int(image.size[1] * w / image.size[0])))
+                    image = image.resize(
+                        (w, int(image.size[1] * w / image.size[0])))
                 elif w <= 0:
-                    image = image.resize((int(image.size[0] * h / image.size[1]), h))
+                    image = image.resize(
+                        (int(image.size[0] * h / image.size[1]), h))
                 else:
                     image = image.resize((w, h))
         elif command == "nothing":
             image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+        elif command == "flags":
+            if id is not None:
+                continue
+            flags = int(params[0])
+            last_id = (1 << flags) - 1
+            if load_sprite_meta(path, last, last_id) is False:
+                return False
+            for i in range(last_id):
+                load_sprite_meta(path, last, i)
+            return
         else:
             return exit_code(1, f"Error: Unknown command '{command}': {path}")
 
+    if id is not None:
+        name = name + "." + str(id)
     return load_sprite(path, name, image)
 
 
