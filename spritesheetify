@@ -26,6 +26,10 @@ parser.add_argument(
     "-e", "--extrude", type=int, default=3,
     help="extrude size (default: 3)"
 )
+# parser.add_argument(
+#     "-t", "--trim", action="store_true",
+#     help="trim the transparency"
+# )
 parser.add_argument(
     "-m", "--max", type=int, default=4096,
     help="maximum size (default: 4096)"
@@ -35,7 +39,7 @@ parser.add_argument(
     help="force spritesheet generation"
 )
 parser.add_argument(
-    "-t", "--text", type=str, default=".png.txt",
+    "-s", "--script", type=str, default=".png.txt",
     help="extension for the script text files"
 )
 
@@ -49,7 +53,7 @@ def collect_paths(filenames):
             yield i
         for i in path.rglob("*.ora"):
             yield i
-        for i in path.rglob("*" + args.text):
+        for i in path.rglob("*" + args.script):
             yield i
 
 
@@ -116,7 +120,7 @@ def load_sprites_directory(filename):
         load_sprite_ora(i)
 
     pending = []
-    for i in path.rglob("*" + args.text):
+    for i in path.rglob("*" + args.script):
         if load_sprite_meta(i) is False:
             pending.append(i)
 
@@ -184,7 +188,7 @@ def load_sprite_ora_layers(z, layer_image, element):
 
 
 def load_sprite_meta(path, last=False):
-    name = path.name.removesuffix(args.text)
+    name = path.name.removesuffix(args.script)
     image = None
 
     content = path.read_text()
@@ -225,6 +229,8 @@ def load_sprite_meta(path, last=False):
                     image = image.resize((int(image.size[0] * h / image.size[1]), h))
                 else:
                     image = image.resize((w, h))
+        elif command == "nothing":
+            image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
         else:
             return exit_code(1, f"Error: Unknown command '{command}': {path}")
 
@@ -344,19 +350,17 @@ output_info_path.write_text(dumps(
         "sprites": [{
             "name": i.name,
             "sheet": i.sheet_id,
-            "w": i.size[0],
-            "h": i.size[1],
-            "area": {
-                "x": 0,
-                "y": 0,
-                "w": i.size[0],
-                "h": i.size[1],
-            },
-            "mapped": {
+            "frame": {
                 "x": i.sheet_pos[0],
                 "y": i.sheet_pos[1],
                 "w": i.size[0],
                 "h": i.size[1],
+            },
+            "box": {
+                "x": i.sheet_pos[0] + i.box_offset[0],
+                "y": i.sheet_pos[1] + i.box_offset[1],
+                "w": i.box_size[0],
+                "h": i.box_size[1],
             },
         } for i in sorted_sprites if not i.skip]
     },

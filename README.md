@@ -3,7 +3,7 @@
 
 Generate packed spritesheets from directories of sprites
 
-- supports extrude
+- supports extrude, transparency box
 - extract layers from OpenRaster files
 - interprets text files to generate sprites on the fly
   - operations: source, rotate, below, above
@@ -28,6 +28,7 @@ Each line contains a single command:
 - `resize w h`: resize current image, aspect ratio if dimension is 0
 - `rotate angle`: rotate current image
 - `rotate+ angle`: rotate current image and expand to fit
+- `nothing`: zero image
 
 ### OpenRaster
 
