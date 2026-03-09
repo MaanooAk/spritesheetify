@@ -23,12 +23,14 @@ Every file with the extension `.png.txt` will be interpreted.
 
 Each line contains a single command:
 
-- `source name`: layer referenced image (alias: `layer`, `above`, `top`)
+- `source name`: layer referenced image (alias: `+`, `layer`, `above`, `top`)
 - `below name`: layer referenced image below (alias: `bottom`)
 - `resize (w) (h)`: resize current image, aspect ratio if dimension is 0
 - `rotate (angle)`: rotate current image
 - `rotate+ (angle)`: rotate current image and expand to fit
 - `nothing`: zero image
+- `export (name)`: export current image as a separate sprite
+- `new`: clear current image
 - `flags (count)`: generate **power set** of images from id `0` to id `(1 << count - 1)`
 + `mask (bitmask) command...`: execute command only if the current image id matches the bitmask
 

@@ -194,18 +194,21 @@ def load_sprite_meta(path, last=False, id=None):
     content = path.read_text()
     lines = content.split("\n")
     flags = None
+    exports = []
     for line in lines:
         if len(line) == 0 or line[0] == "#":
             continue
         parts = line.split(" ")
-        if parts[0] == "mask":
+        if parts[0] in ["mask", "m"]:
             mask = int(parts[1])
             if id & mask == 0:
                 continue
             parts = parts[2:]
 
         command, *params = parts
-        if command in ["source", "layer", "above", "top", "below", "bottom"]:
+        if command in ["new", "clear"]:
+            image = None
+        elif command in ["source", "layer", "above", "top", "+", "below", "bottom"]:
             reference_name = params[0]
             source_sprite = sprites.get(reference_name)
             if source_sprite is None:
@@ -251,8 +254,14 @@ def load_sprite_meta(path, last=False, id=None):
             for i in range(last_id):
                 load_sprite_meta(path, last, i)
             return
+        elif command in ["export", "save", "saveas"]:
+            export_name = params[0]
+            exports.append((export_name, image.copy()))
         else:
             return exit_code(1, f"Error: Unknown command '{command}': {path}")
+
+    for (export_name, export_image) in exports:
+        load_sprite(path, export_name, export_image)
 
     if id is not None:
         name = name + "." + str(id)
