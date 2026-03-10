@@ -28,6 +28,8 @@ Each line contains a single command:
 - `resize (w) (h)`: resize current image, aspect ratio if dimension is 0
 - `rotate (angle)`: rotate current image
 - `rotate+ (angle)`: rotate current image and expand to fit
+- `translate (dx) (dy)`: move current image
+- `translate+ (dx) (dy)`: move current image and expand to fit
 - `nothing`: zero image
 - `export (name)`: export current image as a separate sprite
 - `new`: clear current image

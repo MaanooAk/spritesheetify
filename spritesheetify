@@ -225,11 +225,19 @@ def load_sprite_meta(path, last=False, id=None):
                 else:
                     image.paste(source_sprite.image,
                                 (0, 0), source_sprite.image)
+
         elif command == "rotate":
+            if image is None:
+                continue
             image = image.rotate(int(params[0]))
         elif command == "rotate+":
+            if image is None:
+                continue
             image = image.rotate(int(params[0]), expand=1)
+
         elif command == "resize":
+            if image is None:
+                continue
             if len(params) == 1:
                 image = image.resize((int(params[0]), int(params[0])))
             else:
@@ -242,8 +250,30 @@ def load_sprite_meta(path, last=False, id=None):
                         (int(image.size[0] * h / image.size[1]), h))
                 else:
                     image = image.resize((w, h))
+
+        elif command in ["translate", "move"]:
+            if image is None:
+                continue
+            dx, dy = float(params[0]), float(params[1])
+            dx = round(dx * image.size[0]) if "." in params[0] else dx
+            dy = round(dy * image.size[1]) if "." in params[1] else dy
+            image = image.transform(image.size, Image.AFFINE, (1, 0, -dx, 0, 1, -dy),
+                                    resample=Image.BICUBIC, fillcolor=(0, 0, 0, 0))
+        elif command in ["translate+", "move+"]:
+            if image is None:
+                continue
+            dx, dy = float(params[0]), float(params[1])
+            dx = round(dx * image.size[0]) if "." in params[0] else dx
+            dy = round(dy * image.size[1]) if "." in params[1] else dy
+            # TODO keep track of the image original origin
+            new_size = (w + abs(dx), h + abs(dy))
+            new_image = Image.new("RGBA", new_size, (0, 0, 0, 0))
+            new_image.paste(image, (max(dx, 0), max(dy, 0)))
+            image = new_image
+
         elif command == "nothing":
             image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+
         elif command == "flags":
             if id is not None:
                 continue
@@ -257,8 +287,12 @@ def load_sprite_meta(path, last=False, id=None):
         elif command in ["export", "save", "saveas"]:
             export_name = params[0]
             exports.append((export_name, image.copy()))
+
         else:
             return exit_code(1, f"Error: Unknown command '{command}': {path}")
+
+    if image is None:
+        image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
 
     for (export_name, export_image) in exports:
         load_sprite(path, export_name, export_image)
