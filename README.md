@@ -34,7 +34,8 @@ Each line contains a single command:
 - `export (name)`: export current image as a separate sprite
 - `new`: clear current image
 - `flags (count)`: generate **power set** of images from id `0` to id `(1 << count - 1)`
-+ `mask (bitmask) command...`: execute command only if the current image id matches the bitmask
+- `mask (bitmask) command...`: execute command only if the current image id matches the bitmask
+- `mask^ (shift) command...`: bitmask of `1 << (shift)`
 
 ### OpenRaster
 

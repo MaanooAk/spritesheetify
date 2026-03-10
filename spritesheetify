@@ -199,8 +199,10 @@ def load_sprite_meta(path, last=False, id=None):
         if len(line) == 0 or line[0] == "#":
             continue
         parts = line.split(" ")
-        if parts[0] in ["mask", "m"]:
+        if parts[0] in ["mask", "m", "mask^", "m^"]:
             mask = int(parts[1])
+            if parts[0].endswith("^"):
+                mask = 1 << mask
             if id & mask == 0:
                 continue
             parts = parts[2:]
