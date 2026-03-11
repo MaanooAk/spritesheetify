@@ -42,6 +42,10 @@ parser.add_argument(
     "-s", "--script", type=str, default=".png.txt",
     help="extension for the script text files"
 )
+parser.add_argument(
+    "-g", "--generate", action="store_true",
+    help="generate sprites instead of a spritesheet"
+)
 
 args = parser.parse_args()
 
@@ -64,7 +68,7 @@ def path_mod_time(path):
 
 output_info_path = Path(args.output + ".json")
 
-if not args.force and output_info_path.exists():
+if not args.force and not args.generate and output_info_path.exists():
     output_modified = output_info_path.stat().st_mtime
     sprites_modified = max(map(path_mod_time, collect_paths(args.inputs)))
 
@@ -357,6 +361,11 @@ def load_sprite(path, name, image):
 
     sprites[sprite.name] = sprite
 
+def output_sprites(sprites):
+    directory = Path(args.output)
+    directory.mkdir(parents=True, exist_ok=True)
+    for sprite in sprites:
+        sprite.image.save(f"{args.output}/{sprite.name}.png")
 
 def pack(sprites, sheets):
 
@@ -432,6 +441,10 @@ sprites = OrderedDict()
 
 for input in args.inputs:
     load_sprites_directory(input)
+
+if (args.generate):
+    output_sprites(sprites.values())
+    exit(0)
 
 sorted_sprites = sorted(sprites.values(), key=lambda sprite: (
     -sprite.size[1], -sprite.size[0], sprite.name
