@@ -34,6 +34,8 @@ Each line contains a single command:
 - `nothing`: zero image
 - `export (name)`: export current image as a separate sprite
 - `new`: clear current image
+- `save`: save current image to a stack
+- `restore`: restores the current image to stack pop
 - `flags (count)`: generate **power set** of images from id `0` to id `(1 << count - 1)`
 - `mask (bitmask) command...`: execute command only if the current image id matches the bitmask
 - `mask^ (shift) command...`: bitmask of `1 << (shift)`

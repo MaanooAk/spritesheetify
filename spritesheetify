@@ -188,12 +188,20 @@ def load_sprite_ora_layers(z, layer_image, element):
 
 
 def load_sprite_meta(path, last=False, id=None):
+    try:
+        return load_sprite_meta_try(path, last, id)
+    except Exception :
+        print(f"Error: Failed to parse: {path}", file=stderr)
+        raise
+
+def load_sprite_meta_try(path, last=False, id=None):
     name = path.name.removesuffix(args.script)
     image = None
 
     content = path.read_text()
     lines = content.split("\n")
     flags = None
+    stack = []
     exports = []
     for line in lines:
         if len(line) == 0 or line[0] == "#":
@@ -299,9 +307,14 @@ def load_sprite_meta(path, last=False, id=None):
             for i in range(last_id):
                 load_sprite_meta(path, last, i)
             return
-        elif command in ["export", "save", "saveas"]:
+        elif command in ["export"]:
             export_name = params[0]
             exports.append((export_name, image.copy()))
+
+        elif command in ["save", "push"]:
+            stack.append(image.copy())
+        elif command in ["restore", "pop"]:
+            image = stack.pop()
 
         else:
             return exit_code(1, f"Error: Unknown command '{command}': {path}")
