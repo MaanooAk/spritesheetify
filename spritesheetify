@@ -273,6 +273,19 @@ def load_sprite_meta(path, last=False, id=None):
             new_image.paste(image, (max(dx, 0), max(dy, 0)))
             image = new_image
 
+        elif command in ["scale"]:
+            if image is None:
+                continue
+            d = float(params[0])
+            w = round(d * image.size[0]) if "." in params[0] else d
+            h = round(d * image.size[1]) if "." in params[0] else d
+            new_image = Image.new("RGBA", image.size, (0, 0, 0, 0))
+            scaled = image.resize((w, h), resample=Image.BICUBIC)
+            offset = (round((image.size[0] - w) / 2),
+                      round((image.size[0] - h) / 2))
+            new_image.paste(scaled, offset, scaled)
+            image = new_image
+
         elif command == "nothing":
             image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
 
@@ -308,9 +321,13 @@ def load_sprite(path, name, image):
     sprite = Sprite()
     sprite.path = path
     sprite.name = name
-    sprite.skip = name.startswith(".")
+    sprite.skip = False
     sprite.image = image
     sprite.size = image.size
+
+    if name.startswith("."):
+        sprite.name = name[1:]
+        sprite.skip = True
 
     if "A" in image.getbands():
         alpha_box = image.split()[-1].getbbox()
@@ -325,7 +342,7 @@ def load_sprite(path, name, image):
     if name in sprites:
         return exit_code(1, f"Error: Duplicate name '{name}': {path}, {sprites[name].path}")
 
-    sprites[name] = sprite
+    sprites[sprite.name] = sprite
 
 
 def pack(sprites, sheets):
