@@ -194,9 +194,10 @@ def load_sprite_ora_layers(z, layer_image, element):
 def load_sprite_meta(path, last=False, id=None):
     try:
         return load_sprite_meta_try(path, last, id)
-    except Exception :
+    except Exception:
         print(f"Error: Failed to parse: {path}", file=stderr)
         raise
+
 
 def load_sprite_meta_try(path, last=False, id=None):
     name = path.name.removesuffix(args.script)
@@ -240,16 +241,16 @@ def load_sprite_meta_try(path, last=False, id=None):
                     image.paste(source_sprite.image,
                                 (0, 0), source_sprite.image)
 
-        elif command == "rotate":
+        elif command in ["rotate"]:
             if image is None:
                 continue
             image = image.rotate(int(params[0]))
-        elif command == "rotate+":
+        elif command in ["rotate+"]:
             if image is None:
                 continue
             image = image.rotate(int(params[0]), expand=1)
 
-        elif command == "resize":
+        elif command in ["resize"]:
             if image is None:
                 continue
             if len(params) == 1:
@@ -298,10 +299,10 @@ def load_sprite_meta_try(path, last=False, id=None):
             new_image.paste(scaled, offset, scaled)
             image = new_image
 
-        elif command == "nothing":
+        elif command in ["nothing"]:
             image = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
 
-        elif command == "flags":
+        elif command in ["flags"]:
             if id is not None:
                 continue
             flags = int(params[0])
@@ -361,11 +362,13 @@ def load_sprite(path, name, image):
 
     sprites[sprite.name] = sprite
 
+
 def output_sprites(sprites):
     directory = Path(args.output)
     directory.mkdir(parents=True, exist_ok=True)
     for sprite in sprites:
         sprite.image.save(f"{args.output}/{sprite.name}.png")
+
 
 def pack(sprites, sheets):
 

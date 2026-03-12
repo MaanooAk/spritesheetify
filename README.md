@@ -23,14 +23,14 @@ Every file with the extension `.png.txt` will be interpreted.
 
 Each line contains a single command:
 
-- `source name`: layer referenced image (alias: `+`, `layer`, `above`, `top`)
-- `below name`: layer referenced image below (alias: `bottom`)
+- `source name`: layer referenced image 
+- `below name`: layer referenced image below 
 - `resize (w) (h)`: resize current image, aspect ratio if dimension is 0
 - `rotate (angle)`: rotate current image
 - `rotate+ (angle)`: rotate current image and expand to fit
 - `translate (dx) (dy)`: move current image (multiplier or pixels)
 - `translate+ (dx) (dy)`: move current image and expand to fit
-- `translate (d)`: scale current image (multiplier or pixels)
+- `scale (d)`: scale current image (multiplier or pixels)
 - `nothing`: zero image
 - `export (name)`: export current image as a separate sprite
 - `new`: clear current image
